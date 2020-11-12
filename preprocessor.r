@@ -4,18 +4,8 @@ library(tm)
 library(SnowballC)
 
 #reading companies csv file - beware of encoding
-csv1 = read.csv("southwest_review.csv", encoding = "UTF-8")
-csv1_name = "southwest"
-csv2 = read.csv("traderjoe_review.csv", encoding = "UTF-8")
-csv2_name = "traderjoe"
-csv3 = read.csv("ukg_review.csv", encoding = "UTF-8")
-csv3_name = "ukg"
-csv4 = read.csv("viasat_review.csv", encoding = "UTF-8")
-csv4_name = "viasat"
-csv5 = read.csv("vipkid_review.csv", encoding = "UTF-8")
-csv5_name = "vipkid"
-csv6 = read.csv("wegmansFM_review.csv", encoding = "UTF-8")
-csv6_name = "wegmansFM"
+csv1 = read.csv("all_review.csv", encoding = "UTF-8")
+csv1_name = "all"
 
 
 ################################
@@ -85,8 +75,4 @@ preprocessor = function(csv, name){
 
 
 preprocessor(csv1, csv1_name)
-preprocessor(csv2, csv2_name)
-preprocessor(csv3, csv3_name)
-preprocessor(csv4, csv4_name)
-preprocessor(csv5, csv5_name)
-preprocessor(csv6, csv6_name)
+
