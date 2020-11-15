@@ -6,12 +6,23 @@ library(cluster)
 library(topicmodels)
 library(lda)
 
+#setting working directory where csv files are located
 setwd("C:/Users/user/Desktop/glassdoor/reviews")
+
 #reading companies csv file - beware of encoding
 csv = read.csv("all_review.csv", encoding = "UTF-8")
 
+#extracting review data variables
 pros = csv$pros
 cons = csv$cons
+
+#
+#
+#
+
+##################################
+#### -- Preprocessing start-- ####
+##################################
 
 #all text to lowercase
 #removing numbers, puncuations, stopwords
@@ -33,7 +44,7 @@ corpus_cons = tm_map(corpus_cons, removeWords, stopwords("english"))
 corpus_pros = tm_map(corpus_pros, stemDocument)
 corpus_cons = tm_map(corpus_cons, stemDocument)
 
-#manual stopwords
+#manually adding stopwords
 corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "viasat", 
                                                  "cool", "your", "also", "never", "ever", 
                                                  "ive", "great", "decent", "amaz", "awesom", 
@@ -56,6 +67,7 @@ corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "vias
                                                  "long", "etc", "abl", "big", "one", "driven", "top", "meet",
                                                  "tri", "take", "first", "made", "start", "set", "week", "excit",
                                                  "real", "want", "easi", "someth", "larg"))
+#need update!!!
 corpus_cons = tm_map(corpus_pros, removeWords, c("sometim", "lack", "also", "depend", "make", 
                                                  "alway", "good", "take", "can", "none", 
                                                  "bain", "everyon", "truli", "much", "amaz", 
@@ -79,7 +91,7 @@ corpus_pros = tm_map(corpus_pros, stripWhitespace)
 corpus_cons = tm_map(corpus_cons, stripWhitespace)
 
 
-#matrixing stems : by tdm? | tf-idf?
+#matrixing stems : TDM | DTM
 #LDA? - algorithm - stat inference
 tdm_pros = TermDocumentMatrix(corpus_pros)
 tdm_cons = TermDocumentMatrix(corpus_cons)
@@ -88,15 +100,20 @@ tdm_cons = TermDocumentMatrix(corpus_cons)
 tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.99)
 mat_pros = as.matrix(tdm_pros)
 
-
-# LDA code for learning
-dtm_pros_dtm = as.DocumentTermMatrix(tdm_pros)
-dtm_pros = as.matrix(dtm_pros_dtm)
-
 tdm_cons = removeSparseTerms(tdm_cons, sparse = 0.99)
 mat_cons = as.matrix(tdm_cons)
 
+#
+#
+#
 
+#######################################
+#### -- LDA topic modeling start-- ####
+#######################################
+
+# LDA code for building topics
+dtm_pros_dtm = as.DocumentTermMatrix(tdm_pros)
+dtm_pros = as.matrix(dtm_pros_dtm)
 
 set.seed(1234)
 
@@ -109,19 +126,26 @@ result.lda = lda.collapsed.gibbs.sampler(documents = ldaform$documents,
                                          burnin = 1000, 
                                          alpha = 0.01,  
                                          eta = 0.01 )
+# basic LDA attr info 
+#attributes(result.lda)
+#dim(result.lda$topics)    
+#result.lda$topics
+#dim(result.lda$document_sums)
 
-attributes(result.lda)
-dim(result.lda$topics)    
-result.lda$topics
-
+# 8 topics
 top.topic.words(result.lda$topics)
+# sum of each topic
 result.lda$topic_sums 
-dim(result.lda$document_sums)
+# examples of topic modeling 
 result.lda$document_sums[,1] 
 
-################################
-# --Term association anlysis-- #
-################################
+#
+#
+#
+
+############################################
+#### --Term association anlysis start-- ####
+############################################
 findAssocs(tdm_pros, "schedul", 0.1)
 findAssocs(tdm_pros, "balanc", 0.1)
 findAssocs(tdm_pros, "life", 0.1)
@@ -129,36 +153,57 @@ findAssocs(tdm_pros, "life", 0.1)
 
 
 #are there any asso-corr functions?
+# need help!!!
 
+# 1. word_cor
+# https://rdrr.io/cran/chinese.misc/man/word_cor.html
+# ex) word_cor(tdm_pros, wordvector, type = t, method = "pearson", min = 0.1, p = 0.4)
 
+#
+#
+#
 
 #####################################
-# -- Hierarchicalclustering start-- #
+#### --Sentiment anlysis start-- ####
 #####################################
 
+# 
+#
+#
 
-#Hierarchical clustering - standardization by scale func
-distance = dist(scale(mat_pros), method = "minkowski")
+
+###########################################
+#### -- Hierarchicalclustering start-- ####
+###########################################
+
+
+#Hierarchical clustering - standardization by scale func 
+distance = dist(scale(mat_pros), method = "minkowski") # or euclidean 
 
 #Hierarchical clustering - using "ward.D" method
 hc = hclust(distance, method = "ward.D"); plot(hc)
 
-#
+#visualization of association
 rect.hclust(hc, k = 8)
 
+#check the cluster of documents in console 
 hc_cut = cutree(hc, k = 8); hc_cut
 
+#check the terms
 hc$labels
 
 #check the results in plot
 plot(hc)
 
+#
+#
+#
 
-###############################
-# --k-mean clustering start-- #
-###############################
+#####################################
+#### --K-mean clustering start-- ####
+#####################################
 
-nrow(mat_pros) #265
+nrow(mat_pros) #177
 
 #k-mean clustering
 #mat_km = t(mat_pros)
@@ -168,6 +213,7 @@ mat_km = kmeans(mat_pros, 8)
 
 mat_km$size
 
+#code from course material
 wss <- 1:5
 for(i in 1:5) {wss[i] <- sum(kmeans(mat_pros,i)$withinss)}
 plot(1:5, wss[1:5], type="b", xlab="Number of Clusters", ylab="Within Groups Sum of Squares")
@@ -180,18 +226,70 @@ rowSums(mat_pros) # frequencies of each term in row sums
 
 plot(mat_km$cluster)
 
+#
+#
+#
+
+#############################################
+#### --Further cluster | model analysis--####
+#############################################
+
+#from course material
+#build manual cluster to further analysis | model
+cluster1 <- dtm_pros[,c("remot", "sale", "stock", "discount")]; head(cluster1)
 
 
-###########################
-# --visualization start-- #
-###########################
+# code from course material #########################################################################################################################################
+# Sums #
+C1_Sum <- rowSums(cluster1)
+C2_Sum <- rowSums(cluster2)
+C3_Sum <- rowSums(cluster3)
 
-###############
-#plotting pros#
-###############
+# Create a Score table #
+Score <- matrix(data=0 , n_desc,3);
+Score[,1] <- as.matrix(C1_Sum)
+Score[,2] <- as.matrix(C2_Sum)
+Score[,3] <- as.matrix(C3_Sum)
+
+# Name the Columns/Clusters #
+colnames(Score) <- c("Cluster1", "Cluster2", "Cluster3")
+head(Score)
+
+## Add a Score matrix to the original Data ##
+csv_new <- cbind(csv, Score)
+str(csv)
+
+## Run a Regression ##
+
+summary(csv_new[,c('Rank','Price','Screenshot','Size','StarCurrentVersion', 'RatingCurrentVersion', 'TopInAppPurchases','Cluster1','Cluster2','Cluster3')])
+
+# Variable Transformation #
+Sales <- -log(Apps_new$Rank)
+Log_Rating_Num <- log(Apps_new$RatingCurrentVersion+1)
+
+Apps_new <-cbind(Apps_new, Sales)
+Apps_new <-cbind(Apps_new, Log_Rating_Num)
+
+
+# Build a regression model #
+Apps_Reg <- lm(Sales ~ Price + Screenshot + Size + StarCurrentVersion + Log_Rating_Num + TopInAppPurchases + Cluster1 + Cluster2 + Cluster3, data=Apps_new)
+summary(Apps_Reg)
+#####################################################################################################################################################################
+
+#
+#
+#
+
+#################################
+#### --Visualization start-- ####
+#################################
+
+##################
+#1. plotting pros#
+##################
 freq_pros = rowSums(mat_pros, na.rm=TRUE)
 
-#showing data more than 50
+#showing data more than 50 frequency
 freq_pros = subset(freq_pros, freq_pros>=50)
 barplot(freq_pros, las = 2, col = rainbow(7))
 
@@ -199,16 +297,16 @@ barplot(freq_pros, las = 2, col = rainbow(7))
 v_pros <- sort(rowSums(mat_pros),decreasing=TRUE) 
 d_pros <- data.frame(word = names(v_pros),freq=v_pros)
 
-# top 50
+# top 50 in console
 head(d_pros, 50)
 
 
-###############
-#plotting cons#
-###############
+##################
+#2. plotting cons#
+##################
 freq_cons = rowSums(mat_cons, na.rm=TRUE)
 
-#showing data more than 50
+#showing data more than 50 frequency
 freq_cons = subset(freq_cons, freq_cons>=50)
 barplot(freq_cons, las = 2, col = rainbow(7))
 
@@ -216,9 +314,13 @@ barplot(freq_cons, las = 2, col = rainbow(7))
 v_cons <- sort(rowSums(mat_cons),decreasing=TRUE) 
 d_cons <- data.frame(word = names(v_cons),freq=v_cons)
 
-# top 50
+# top 50 in console
 head(d_cons, 50)
 
-#build manual cluster to further analysis | model
-cluster1 <- dtm_pros[,c("remot", "sale", "stock", "discount")]; head(cluster1)
+#
+#
+#
+
+
+
 
