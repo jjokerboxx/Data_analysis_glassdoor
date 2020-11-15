@@ -3,26 +3,15 @@ library(dplyr)
 library(tm)
 library(SnowballC)
 
+# reading companies csv file - beware of encoding
+# in session tab menu, you can set working directory to reviews folder 
+# please change csv file name if the file is written in wrong syntax
+# syntax : your_name_eng + _review.csv
+setwd("C:/Users/user/Desktop/glassdoor/reviews/south")
+csv1 = read.csv("kihun_review.csv", encoding = "UTF-8")
 
-#reading companies csv file - beware of encoding
-#please change csv file name if the file is written in wrong syntax
-# syntax : corpshortname + _review.csv
-csv1 = read.csv("corp_review.csv", encoding = "UTF-8")
-
-#write corpshortname in between the quotation marks
-csv1_name = "name"
-
-#same
-csv2 = read.csv("corp_review.csv", encoding = "UTF-8")
-csv2_name = "name"
-csv3 = read.csv("corp_review.csv", encoding = "UTF-8")
-csv3_name = "name"
-csv4 = read.csv("corp_review.csv", encoding = "UTF-8")
-csv4_name = "name"
-csv5 = read.csv("corp_review.csv", encoding = "UTF-8")
-csv5_name = "name"
-csv6 = read.csv("corp_review.csv", encoding = "UTF-8")
-csv6_name = "name"
+#write your name in English in between the quotation marks
+csv1_name = "kihun"
 
 
 ################################
@@ -70,10 +59,10 @@ preprocessor = function(csv, name){
   tdm_cons = TermDocumentMatrix(corpus_cons)
   
   #removing sparsity
-  tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.98)
+  tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.99)
   mat_pros = as.matrix(tdm_pros)
   
-  tdm_cons = removeSparseTerms(tdm_cons, sparse = 0.98)
+  tdm_cons = removeSparseTerms(tdm_cons, sparse = 0.99)
   mat_cons = as.matrix(tdm_cons)
   
   
@@ -94,11 +83,8 @@ preprocessor = function(csv, name){
 
 #run preprocessor for each companies
 preprocessor(csv1, csv1_name)
-preprocessor(csv2, csv2_name)
-preprocessor(csv3, csv3_name)
-preprocessor(csv4, csv4_name)
-preprocessor(csv5, csv5_name)
-preprocessor(csv6, csv6_name)
 
-#total 12csv files will be generated each 6 files for pros and cons
-#in session tab menu, you can set working directory to reviews folder 
+
+# total 2 csv files will be generated for pros and cons
+# send stopwords with quotation marks and comma
+# ex) "happy", "great", "ametour"
