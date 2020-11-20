@@ -5,6 +5,8 @@ library(SnowballC)
 library(cluster)
 library(topicmodels)
 library(lda)
+library(arules)
+library(chinese.misc)
 
 #setting working directory where csv files are located
 setwd("C:/Users/user/Desktop/glassdoor/reviews")
@@ -66,9 +68,11 @@ corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "vias
                                                  "alway", "perk", "hubspot", "esop", "friday", "just",
                                                  "long", "etc", "abl", "big", "one", "driven", "top", "meet",
                                                  "tri", "take", "first", "made", "start", "set", "week", "excit",
-                                                 "real", "want", "easi", "someth", "larg"))
+                                                 "real", "want", "easi", "someth", "larg",
+                                                 
+                                                 "peopl", "benefit", "cultur", "employe"))
 #need update!!!
-corpus_cons = tm_map(corpus_pros, removeWords, c("sometim", "lack", "also", "depend", "make", 
+corpus_cons = tm_map(corpus_cons, removeWords, c("sometim", "lack", "also", "depend", "make", 
                                                  "alway", "good", "take", "can", "none", 
                                                  "bain", "everyon", "truli", "much", "amaz", 
                                                  "awesome", "way", "provid", "year", "will", 
@@ -96,13 +100,25 @@ corpus_cons = tm_map(corpus_cons, stripWhitespace)
 tdm_pros = TermDocumentMatrix(corpus_pros)
 tdm_cons = TermDocumentMatrix(corpus_cons)
 
+
 #removing sparsity
-tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.99)
+tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.9999)
 mat_pros = as.matrix(tdm_pros)
+rownames(mat_pros)
 
 tdm_cons = removeSparseTerms(tdm_cons, sparse = 0.99)
 mat_cons = as.matrix(tdm_cons)
+dtm_pros = t(mat_pros)
 
+#DTM with TF-IDF
+dtm_pros = DocumentTermMatrix(corpus_pros) #put tf-idf func here
+mat_dtm_pros = as.matrix(dtm_pros); head(mat_dtm_pros, 3)
+colnames(mat_dtm_pros)
+
+tf_idf_pros = DocumentTermMatrix(corpus_pros, control=list(weighting=weightTfIdf))
+mat_tf_idf_pros = as.matrix(tf_idf_pros)
+colnames(mat_tf_idf_pros)
+inspect(tf_idf_pros[1:10,1:5])
 #
 #
 #
@@ -112,15 +128,15 @@ mat_cons = as.matrix(tdm_cons)
 #######################################
 
 # LDA code for building topics
-dtm_pros_dtm = as.DocumentTermMatrix(tdm_pros)
-dtm_pros = as.matrix(dtm_pros_dtm)
+dtm_pros_LDA = as.DocumentTermMatrix(tdm_pros)
+dtm_pros = as.matrix(dtm_pros_LDA)
 
 set.seed(1234)
 
-ldaform = dtm2ldaformat(dtm_pros_dtm, omit_empty=T)
+ldaform = dtm2ldaformat(dtm_pros_LDA, omit_empty=T)
 
 result.lda = lda.collapsed.gibbs.sampler(documents = ldaform$documents,
-                                         K = 8,
+                                         K = 5,
                                          vocab = ldaform$vocab,
                                          num.iterations = 5000,  
                                          burnin = 1000, 
@@ -132,12 +148,13 @@ result.lda = lda.collapsed.gibbs.sampler(documents = ldaform$documents,
 #result.lda$topics
 #dim(result.lda$document_sums)
 
-# 8 topics
+# 5 topics
 top.topic.words(result.lda$topics)
 # sum of each topic
 result.lda$topic_sums 
 # examples of topic modeling 
 result.lda$document_sums[,1] 
+
 
 #
 #
@@ -146,18 +163,27 @@ result.lda$document_sums[,1]
 ############################################
 #### --Term association anlysis start-- ####
 ############################################
+
+#findAssocs function to show certain association with terms
 findAssocs(tdm_pros, "schedul", 0.1)
 findAssocs(tdm_pros, "balanc", 0.1)
 findAssocs(tdm_pros, "life", 0.1)
 
 
+#Apriori algorithm to find term relation
+#https://rfriend.tistory.com/193
+asd[asd>1] = 1
 
-#are there any asso-corr functions?
-# need help!!!
+rules1 = apriori(asd, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
 
-# 1. word_cor
+inspect(sort(rules1))
+
+
+# word_cor function to show correlation with terms
 # https://rdrr.io/cran/chinese.misc/man/word_cor.html
 # ex) word_cor(tdm_pros, wordvector, type = t, method = "pearson", min = 0.1, p = 0.4)
+words = row.names(tdm_pros)
+word_cor(tdm_pros, words, type = "tdm", method = "pearson", p = 0.1, min = 0.1)
 
 #
 #
@@ -178,7 +204,7 @@ findAssocs(tdm_pros, "life", 0.1)
 
 
 #Hierarchical clustering - standardization by scale func 
-distance = dist(scale(mat_pros), method = "minkowski") # or euclidean 
+distance = dist(scale(mat_pros), method = "euclidean") # euclidean | minkowski
 
 #Hierarchical clustering - using "ward.D" method
 hc = hclust(distance, method = "ward.D"); plot(hc)
@@ -214,9 +240,9 @@ mat_km = kmeans(mat_pros, 8)
 mat_km$size
 
 #code from course material
-wss <- 1:5
-for(i in 1:5) {wss[i] <- sum(kmeans(mat_pros,i)$withinss)}
-plot(1:5, wss[1:5], type="b", xlab="Number of Clusters", ylab="Within Groups Sum of Squares")
+wss <- 1:10
+for(i in 1:10) {wss[i] <- sum(kmeans(mat_pros,i)$withinss)}
+plot(1:10, wss[1:10], type="b", xlab="Number of Clusters", ylab="Within Groups Sum of Squares")
 # type="b" creates a plot with lines between points # 
 wss
 
@@ -239,7 +265,7 @@ plot(mat_km$cluster)
 cluster1 <- dtm_pros[,c("remot", "sale", "stock", "discount")]; head(cluster1)
 
 
-# code from course material #########################################################################################################################################
+# code from course material #### On the Work! ##################################################################################################################################
 # Sums #
 C1_Sum <- rowSums(cluster1)
 C2_Sum <- rowSums(cluster2)
@@ -300,6 +326,8 @@ d_pros <- data.frame(word = names(v_pros),freq=v_pros)
 # top 50 in console
 head(d_pros, 50)
 
+## --adding word cloud visualization-- ##
+
 
 ##################
 #2. plotting cons#
@@ -316,6 +344,9 @@ d_cons <- data.frame(word = names(v_cons),freq=v_cons)
 
 # top 50 in console
 head(d_cons, 50)
+
+## --adding word cloud visualization-- ##
+
 
 #
 #
