@@ -9,8 +9,8 @@ library(arules)
 library(chinese.misc)
 
 #setting working directory where csv files are located
-setwd("C:/Users/user/Desktop/glassdoor/reviews")
-
+#setwd("C:/Users/user/Desktop/glassdoor/reviews")
+setwd("/Users/igihun/Desktop/glassdoor/reviews")
 #reading companies csv file - beware of encoding
 csv = read.csv("all_review.csv", encoding = "UTF-8")
 
@@ -68,7 +68,7 @@ corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "vias
                                                  "alway", "perk", "hubspot", "esop", "friday", "just",
                                                  "long", "etc", "abl", "big", "one", "driven", "top", "meet",
                                                  "tri", "take", "first", "made", "start", "set", "week", "excit",
-                                                 "real", "want", "easi", "someth", "larg",
+                                                 "real", "want", "easi", "someth", "larg", "year",
                                                  
                                                  "peopl", "benefit", "cultur", "employe"))
 #need update!!!
@@ -87,7 +87,7 @@ corpus_cons = tm_map(corpus_cons, removeWords, c("sometim", "lack", "also", "dep
                                                  "see", "number", "keep", "within", "last", "certain",
                                                  "better", "yet", "best", "work", "good", "compani", "lot",
                                                  "get", "like", "well", "smart", "excel", "day", "truli",
-                                                 "alway", "perk", "one", "long"))
+                                                 "alway", "perk", "one", "long", "year"))
 
 
 #trimming unnecessary spaces
@@ -96,29 +96,40 @@ corpus_cons = tm_map(corpus_cons, stripWhitespace)
 
 
 #matrixing stems : TDM | DTM
-#LDA? - algorithm - stat inference
+#TDM for Clustering
 tdm_pros = TermDocumentMatrix(corpus_pros)
 tdm_cons = TermDocumentMatrix(corpus_cons)
 
+#DTM for TF-IDF
+dtm_pros = DocumentTermMatrix(corpus_pros)
+dtm_cons = DocumentTermMatrix(corpus_cons)
 
 #removing sparsity
-tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.9999)
+tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.99)
 mat_pros = as.matrix(tdm_pros)
-rownames(mat_pros)
+nrow(mat_pros)
 
 tdm_cons = removeSparseTerms(tdm_cons, sparse = 0.99)
 mat_cons = as.matrix(tdm_cons)
-dtm_pros = t(mat_pros)
 
-#DTM with TF-IDF
-dtm_pros = DocumentTermMatrix(corpus_pros) #put tf-idf func here
-mat_dtm_pros = as.matrix(dtm_pros); head(mat_dtm_pros, 3)
-colnames(mat_dtm_pros)
+dtm_pros = removeSparseTerms(dtm_pros, spare = 0.99)
+mat_dtm_pros = as.matrix(dtm_pros)
 
+dtm_cons = removeSparseTerms(dtm_cons, spare = 0.99)
+mat_dtm_cons = as.matrix(dtm_cons)
+
+#TF-IDF
 tf_idf_pros = DocumentTermMatrix(corpus_pros, control=list(weighting=weightTfIdf))
 mat_tf_idf_pros = as.matrix(tf_idf_pros)
 colnames(mat_tf_idf_pros)
 inspect(tf_idf_pros[1:10,1:5])
+
+
+tf_idf_cons = DocumentTermMatrix(corpus_cons, control=list(weighting=weightTfIdf))
+mat_tf_idf_cons = as.matrix(tf_idf_cons)
+
+
+
 #
 #
 #
@@ -152,6 +163,7 @@ result.lda = lda.collapsed.gibbs.sampler(documents = ldaform$documents,
 top.topic.words(result.lda$topics)
 # sum of each topic
 result.lda$topic_sums 
+
 # examples of topic modeling 
 result.lda$document_sums[,1] 
 
@@ -165,16 +177,47 @@ result.lda$document_sums[,1]
 ############################################
 
 #findAssocs function to show certain association with terms
-findAssocs(tdm_pros, "schedul", 0.1)
-findAssocs(tdm_pros, "balanc", 0.1)
-findAssocs(tdm_pros, "life", 0.1)
+findAssocs(tdm_pros, "pay", 0.1)
 
+
+pros_term = rownames(mat_pros)
+assocs = findAssocs(tdm_pros, pros_term, 0.1)
+
+test = findAssocs(tdm_pros, "allow", 0.1)
+attr_assoc = test[[1]]; attr_assoc
+elem = attr_assoc[8]
+length(attr_assoc)
+names(elem)
+for (i in 1:length(attr_assoc)) {
+  name = names(attr_assoc[i])
+  print(name)
+}
+
+#new matrix for assoc-apriori test
+new_mat_apriori = matrix(data = 0, nrow = nrow(mat_pros), ncol = nrow(mat_pros))
+rownames(new_mat_apriori) = rownames(tdm_pros)
+colnames(new_mat_apriori) = rownames(tdm_pros)
+
+for (i in pros_term) {
+  term_assoc = findAssocs(tdm_pros, i, 0.15)
+  attrs_assoc = term_assoc[[1]]
+  for (j in 1:length(attrs_assoc)) {
+    name = names(attrs_assoc[j])
+    #print(name)
+    new_mat_apriori[i,name] = 1
+  }
+}
+new_mat_apriori[1:10,1:10]
+nrow(new_mat_apriori)
+
+rules2 = apriori(new_mat_apriori, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
+inspect(sort(rules2))
 
 #Apriori algorithm to find term relation
 #https://rfriend.tistory.com/193
-asd[asd>1] = 1
-
-rules1 = apriori(asd, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
+mat_dtm_pros[mat_dtm_pros>1] = 1
+rownames(mat_pros)
+rules1 = apriori(mat_dtm_pros, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
 
 inspect(sort(rules1))
 
@@ -207,19 +250,19 @@ word_cor(tdm_pros, words, type = "tdm", method = "pearson", p = 0.1, min = 0.1)
 distance = dist(scale(mat_pros), method = "euclidean") # euclidean | minkowski
 
 #Hierarchical clustering - using "ward.D" method
-hc = hclust(distance, method = "ward.D"); plot(hc)
+hc = hclust(distance, method = "ward.D"); plot(hc) # visualization #
 
 #visualization of association
-rect.hclust(hc, k = 8)
+rect.hclust(hc, k = 5) # visualization of hclust with red box#
 
 #check the cluster of documents in console 
-hc_cut = cutree(hc, k = 8); hc_cut
+hc_cut = cutree(hc, k = 5); hc_cut
 
 #check the terms
 hc$labels
 
 #check the results in plot
-plot(hc)
+plot(hc) # visualization of hclusering#
 
 #
 #
@@ -239,18 +282,17 @@ mat_km = kmeans(mat_pros, 8)
 
 mat_km$size
 
-#code from course material
-wss <- 1:10
-for(i in 1:10) {wss[i] <- sum(kmeans(mat_pros,i)$withinss)}
-plot(1:10, wss[1:10], type="b", xlab="Number of Clusters", ylab="Within Groups Sum of Squares")
-# type="b" creates a plot with lines between points # 
+#code from course material for elbow of k-mean clustering
+wss <- 1:5
+for(i in 1:5) {wss[i] <- sum(kmeans(mat_pros,i)$withinss)}
+plot(1:5, wss[1:5], type="b", xlab="Number of Clusters", ylab="Within Groups Sum of Squares") # visualization of elbow #
 wss
 
 rowSums(mat_pros) # frequencies of each term in row sums
 # if we make DTM - and select some terms for cluster -> rowsums will show the frequency of the clusters
 # later, regression can be applied
 
-plot(mat_km$cluster)
+plot(mat_km$cluster) # visualization of k-mean cluster#
 
 #
 #
@@ -317,14 +359,14 @@ freq_pros = rowSums(mat_pros, na.rm=TRUE)
 
 #showing data more than 50 frequency
 freq_pros = subset(freq_pros, freq_pros>=50)
-barplot(freq_pros, las = 2, col = rainbow(7))
+barplot(freq_pros, las = 2) # visualization #
 
 #sorting
 v_pros <- sort(rowSums(mat_pros),decreasing=TRUE) 
 d_pros <- data.frame(word = names(v_pros),freq=v_pros)
 
 # top 50 in console
-head(d_pros, 50)
+head(d_pros, 20)
 
 ## --adding word cloud visualization-- ##
 
@@ -336,7 +378,7 @@ freq_cons = rowSums(mat_cons, na.rm=TRUE)
 
 #showing data more than 50 frequency
 freq_cons = subset(freq_cons, freq_cons>=50)
-barplot(freq_cons, las = 2, col = rainbow(7))
+barplot(freq_cons, las = 2) # visualization #
 
 #sorting
 v_cons <- sort(rowSums(mat_cons),decreasing=TRUE) 
@@ -344,6 +386,12 @@ d_cons <- data.frame(word = names(v_cons),freq=v_cons)
 
 # top 50 in console
 head(d_cons, 50)
+
+#saving top 50 terms of pros and cons
+d_all = cbind(d_pros[1:50,], d_cons[1:50,])
+rownames(d_all) <- 1:nrow(d_all)
+
+write.csv(d_all, "TF_All_Reviews.csv")
 
 ## --adding word cloud visualization-- ##
 
