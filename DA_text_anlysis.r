@@ -7,25 +7,121 @@ library(topicmodels)
 library(lda)
 library(arules)
 library(chinese.misc)
+library(RColorBrewer)
+library(syuzhet)
+library(ggplot2)
+library(wordcloud)
 
 #setting working directory where csv files are located
-#setwd("C:/Users/user/Desktop/glassdoor/reviews")
-setwd("/Users/igihun/Desktop/glassdoor/reviews")
-#reading companies csv file - beware of encoding
-csv = read.csv("all_review.csv", encoding = "UTF-8")
+setwd("C:/Users/user/Desktop/glassdoor/reviews")
+#setwd("/Users/igihun/Desktop/glassdoor/reviews")
+
+###########################################################
+#### -- Merging all companies csv files into 1 file -- ####
+###########################################################
+
+review_dir = "C:/Users/user/Desktop/glassdoor/reviews"
+review_list = list.files(review_dir)
+
+#Please write your name in English in between quotation marks
+name = "all"
+
+
+
+#making empty data frame
+data = data.frame()
+
+#rbinding csv files
+for (c in review_list) {
+  print(c)
+  blanck = read.csv(c, encoding = "UTF-8")
+  c_name = gsub("_review.csv", "", c)
+  blanck[,20] = c_name
+  colnames(blanck)[20] = "cor_name"
+  blanck = blanck[1:400,1:20] #400 rows and 19 columns + add new cor_name column
+  data = rbind(data, blanck)
+}
+
+#saving enw csv file
+csv_file_name = "review.csv"
+fin_name = paste(name,csv_file_name,sep = "_")
+write.csv(data, fin_name)
+
+
+
+
+
+#reading Merged csv file - beware of encoding
+#csv = read.csv("all_review.csv", encoding = "UTF-8")
+csv = read.csv("C:/Users/user/Desktop/glassdoor/reviews/all_review.csv")
 
 #extracting review data variables
 pros = csv$pros
 cons = csv$cons
 
-#
-#
-#
+#extracting numeric rating data variables
+balance = csv$rating_balance
+culture = csv$rating_culture
+develop = csv$rating_career
+benefit = csv$rating_comp
+manage = csv$rating_mgmt
 
-##################################
-#### -- Preprocessing start-- ####
-##################################
 
+
+
+
+########################################
+#### -- Data Preprocessing start -- ####
+########################################
+
+###################
+## -- NUMERIC -- ##
+###################
+# Statistics summary 
+summary(balance)
+summary(culture)
+summary(develop)
+summary(benefit)
+summary(manage)
+as.numeric(balance)
+
+summary(scale(balance))
+summary(scale(culture))
+summary(scale(develop))
+summary(scale(benefit))
+summary(scale(manage))
+
+
+#replace NA or drop NA
+for (i in csv$X) {
+  if (is.na(csv$rating_culture[i]) & is.na(csv$rating_career[i]) & is.na(csv$rating_comp[i]) & is.na(csv$rating_mgmt[i])) {
+    if (is.na(csv$rating_balance[i])) {
+      csv = subset(csv, !(csv$X == i))
+    }
+    else {
+      csv$rating_culture[i] = csv$rating_balance[i]
+      csv$rating_career[i] = csv$rating_balance[i]
+      csv$rating_comp[i] = csv$rating_balance[i]
+      csv$rating_mgmt[i] = csv$rating_balance[i]
+    }
+    
+  }
+}
+
+#Individual corporation summary
+sum_bal = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_balance), na.rm = T))
+sum_cul = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_culture), na.rm = T))
+sum_car = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_career), na.rm = T))
+sum_ben = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_comp), na.rm = T))
+sum_mgn = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_mgmt), na.rm = T))
+
+
+
+
+
+################
+## -- TEXT -- ##
+################
 #all text to lowercase
 #removing numbers, puncuations, stopwords
 text_corpus_pros <- iconv(pros, "ASCII", "UTF-8", sub="byte")
@@ -47,6 +143,9 @@ corpus_pros = tm_map(corpus_pros, stemDocument)
 corpus_cons = tm_map(corpus_cons, stemDocument)
 
 #manually adding stopwords
+# different stopwords list to verify different analysis
+
+#Removing too prevalent words in pros that might dillute the results
 corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "viasat", 
                                                  "cool", "your", "also", "never", "ever", 
                                                  "ive", "great", "decent", "amaz", "awesom", 
@@ -70,8 +169,42 @@ corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "vias
                                                  "tri", "take", "first", "made", "start", "set", "week", "excit",
                                                  "real", "want", "easi", "someth", "larg", "year",
                                                  
-                                                 "peopl", "benefit", "cultur", "employe"))
-#need update!!!
+                                                 "peopl", "benefit", "cultur", "employe")) 
+
+#Removing stopwords exclude the sentiment words for Association Analysis - pros
+corpus_pros = tm_map(corpus_pros, removeWords, c("vipkid", "much", "just", "viasat", 
+                                                  "your", "also",  
+                                                 "ive",  
+                                                 "will", "incred", "can", "dont", 
+                                                  "often", "way", "find", 
+                                                 "llnl", "realli", "bit", "say", "hubspot", 
+                                                 "krono", "still", "thing", "may", "sfg", "sammon", 
+                                                 "half",  "given", "industry", "don't",
+                                                 "nvidia", "put", "month", "cut", "TRUE", "need",
+                                                  "clear", "build", "done", "anderson",
+                                                 "import", "pto", "within", "cant", "actual", "that",
+                                                 "come", "esop", "even", "fantast", "look",
+                                                 "corpor", "there", "everi", "rally", "mani",
+                                                 "busi", "forward", "direct", "part", "use",
+                                                 "anyth", "sinc", "howev", "none", "see", "number",
+                                                 "keep", "around", "volunt", "last", "give", "yet", 
+                                                 "work", "good", "compani", "lot",  "make",
+                                                 "get", "like", "well", "day", 
+                                                 "alway", "perk", "hubspot", "esop", "friday", "just",
+                                                 "long", "etc", "abl", "big", "one", "driven", "top", "meet",
+                                                 "tri", "take", "first", "made", "start", "set", "week", "excit",
+                                                 "real", "want", "easi", "someth", "larg", "year",
+                                                 "work", "compani", "benefit", 
+                                                 
+                                                 "great",  "everi", "week", "new", "job", "know", "better", "feel", "best",
+                                                 "truli", "everyon")) #"peopl", "cultur", "employe", "opportun",
+
+
+
+
+
+## -- Cons -- ##
+# In sentimaent analysis, we have to differ the stopword to analyze each documnets!!
 corpus_cons = tm_map(corpus_cons, removeWords, c("sometim", "lack", "also", "depend", "make", 
                                                  "alway", "good", "take", "can", "none", 
                                                  "bain", "everyon", "truli", "much", "amaz", 
@@ -89,6 +222,24 @@ corpus_cons = tm_map(corpus_cons, removeWords, c("sometim", "lack", "also", "dep
                                                  "get", "like", "well", "smart", "excel", "day", "truli",
                                                  "alway", "perk", "one", "long", "year"))
 
+#Removing stopwords exclude the sentiment words for Sentiment analysis - cons
+corpus_cons = tm_map(corpus_cons, removeWords, c("sometim", "lack", "also", "depend", "make", 
+                                                 "alway",  "take", "can", "none", 
+                                                 "bain", "everyon", "truli", "much",  "way", "provid", "year", "will", 
+                                                 "around", "extrem",  "big", "alway", 
+                                                 "can", "just", "docusign",  "use", 
+                                                 "north", "seem", "due", "still", "there", "hubspot",
+                                                 "con", "may", "cant", "doesnt", "actual",
+                                                 "across", "that", "bit", "con", "without",
+                                                 "org", "nvidia", "sammon", "busi",  "back",
+                                                 "come", "even", "look", "corpor", "always",
+                                                 "less", "part", "anyth", "sinc", "howev", "noth",
+                                                 "see", "number", "keep", "within", "last", "certain",
+                                                 "yet", "best", "work",  "compani", "lot",
+                                                 "get", "like", "well",  "day", "truli",
+                                                 "alway", "perk", "one", "long", "year", 
+                                                 "work", "compani", "benefit", "think", "thing", "far", "arent", "dont", "your"))
+
 
 #trimming unnecessary spaces
 corpus_pros = tm_map(corpus_pros, stripWhitespace)
@@ -100,10 +251,6 @@ corpus_cons = tm_map(corpus_cons, stripWhitespace)
 tdm_pros = TermDocumentMatrix(corpus_pros)
 tdm_cons = TermDocumentMatrix(corpus_cons)
 
-#DTM for TF-IDF
-dtm_pros = DocumentTermMatrix(corpus_pros)
-dtm_cons = DocumentTermMatrix(corpus_cons)
-
 #removing sparsity
 tdm_pros = removeSparseTerms(tdm_pros, sparse = 0.99)
 mat_pros = as.matrix(tdm_pros)
@@ -112,138 +259,93 @@ nrow(mat_pros)
 tdm_cons = removeSparseTerms(tdm_cons, sparse = 0.99)
 mat_cons = as.matrix(tdm_cons)
 
-dtm_pros = removeSparseTerms(dtm_pros, spare = 0.99)
+
+#DTM for TF-IDF
+dtm_pros = DocumentTermMatrix(corpus_pros)
+dtm_pros_tfidf = DocumentTermMatrix(corpus_pros, control = list(weighting=weightTfIdf))
+
+dtm_cons = DocumentTermMatrix(corpus_cons)
+dtm_cons_tfidf = DocumentTermMatrix(corpus_cons, control = list(weighting=weightTfIdf))
+
+#removing sparsity
+dtm_pros = removeSparseTerms(dtm_pros, sparse = 0.99)
 mat_dtm_pros = as.matrix(dtm_pros)
 
-dtm_cons = removeSparseTerms(dtm_cons, spare = 0.99)
+dtm_cons = removeSparseTerms(dtm_cons, sparse = 0.99)
 mat_dtm_cons = as.matrix(dtm_cons)
 
-#TF-IDF
-tf_idf_pros = DocumentTermMatrix(corpus_pros, control=list(weighting=weightTfIdf))
-mat_tf_idf_pros = as.matrix(tf_idf_pros)
-colnames(mat_tf_idf_pros)
-inspect(tf_idf_pros[1:10,1:5])
+dtm_pros_tfidf = removeSparseTerms(dtm_pros_tfidf, sparse = 0.99)
+mat_pros_tfidf = as.matrix(dtm_pros_tfidf)
 
-
-tf_idf_cons = DocumentTermMatrix(corpus_cons, control=list(weighting=weightTfIdf))
-mat_tf_idf_cons = as.matrix(tf_idf_cons)
+dtm_cons_tfidf = removeSparseTerms(dtm_cons_tfidf, sparse = 0.99)
+mat_cons_tfidf = as.matrix(dtm_cons_tfidf)
 
 
 
-#
-#
-#
-
-#######################################
-#### -- LDA topic modeling start-- ####
-#######################################
-
-# LDA code for building topics
-dtm_pros_LDA = as.DocumentTermMatrix(tdm_pros)
-dtm_pros = as.matrix(dtm_pros_LDA)
-
-set.seed(1234)
-
-ldaform = dtm2ldaformat(dtm_pros_LDA, omit_empty=T)
-
-result.lda = lda.collapsed.gibbs.sampler(documents = ldaform$documents,
-                                         K = 5,
-                                         vocab = ldaform$vocab,
-                                         num.iterations = 5000,  
-                                         burnin = 1000, 
-                                         alpha = 0.01,  
-                                         eta = 0.01 )
-# basic LDA attr info 
-#attributes(result.lda)
-#dim(result.lda$topics)    
-#result.lda$topics
-#dim(result.lda$document_sums)
-
-# 5 topics
-top.topic.words(result.lda$topics)
-# sum of each topic
-result.lda$topic_sums 
-
-# examples of topic modeling 
-result.lda$document_sums[,1] 
 
 
-#
-#
-#
-
-############################################
-#### --Term association anlysis start-- ####
-############################################
-
-#findAssocs function to show certain association with terms
-findAssocs(tdm_pros, "pay", 0.1)
 
 
-pros_term = rownames(mat_pros)
-assocs = findAssocs(tdm_pros, pros_term, 0.1)
 
-test = findAssocs(tdm_pros, "allow", 0.1)
-attr_assoc = test[[1]]; attr_assoc
-elem = attr_assoc[8]
-length(attr_assoc)
-names(elem)
-for (i in 1:length(attr_assoc)) {
-  name = names(attr_assoc[i])
-  print(name)
-}
-
-#new matrix for assoc-apriori test
-new_mat_apriori = matrix(data = 0, nrow = nrow(mat_pros), ncol = nrow(mat_pros))
-rownames(new_mat_apriori) = rownames(tdm_pros)
-colnames(new_mat_apriori) = rownames(tdm_pros)
-
-for (i in pros_term) {
-  term_assoc = findAssocs(tdm_pros, i, 0.15)
-  attrs_assoc = term_assoc[[1]]
-  for (j in 1:length(attrs_assoc)) {
-    name = names(attrs_assoc[j])
-    #print(name)
-    new_mat_apriori[i,name] = 1
-  }
-}
-new_mat_apriori[1:10,1:10]
-nrow(new_mat_apriori)
-
-rules2 = apriori(new_mat_apriori, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
-inspect(sort(rules2))
-
-#Apriori algorithm to find term relation
-#https://rfriend.tistory.com/193
-mat_dtm_pros[mat_dtm_pros>1] = 1
-rownames(mat_pros)
-rules1 = apriori(mat_dtm_pros, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
-
-inspect(sort(rules1))
+##############################################
+#### -- Term Frequency Analysis start -- #####
+##############################################
 
 
-# word_cor function to show correlation with terms
-# https://rdrr.io/cran/chinese.misc/man/word_cor.html
-# ex) word_cor(tdm_pros, wordvector, type = t, method = "pearson", min = 0.1, p = 0.4)
-words = row.names(tdm_pros)
-word_cor(tdm_pros, words, type = "tdm", method = "pearson", p = 0.1, min = 0.1)
+#1. plotting pros
 
-#
-#
-#
+freq_pros = rowSums(mat_pros, na.rm=TRUE)
 
-#####################################
-#### --Sentiment anlysis start-- ####
-#####################################
-
-# 
-#
-#
+#showing data more than 50 frequency
+freq_pros = subset(freq_pros, freq_pros>=50)
 
 
-###########################################
-#### -- Hierarchicalclustering start-- ####
-###########################################
+barplot(freq_pros, las = 2) # visualization #
+barplot(sort(freq_pros), las = 2)
+
+#sorting
+v_pros <- sort(rowSums(mat_pros),decreasing=TRUE) 
+d_pros <- data.frame(word = names(v_pros),freq=v_pros)
+
+# top 50 in console
+head(d_pros, 20)
+
+## --adding word cloud visualization-- ##
+
+
+
+#2. plotting cons
+
+freq_cons = rowSums(mat_cons, na.rm=TRUE)
+
+#showing data more than 50 frequency
+freq_cons = subset(freq_cons, freq_cons>=50)
+barplot(freq_cons, las = 2) # visualization #
+barplot(sort(freq_cons), las = 2)
+
+#sorting
+v_cons <- sort(rowSums(mat_cons),decreasing=TRUE) 
+d_cons <- data.frame(word = names(v_cons),freq=v_cons)
+
+# top 50 in console
+head(d_cons, 50)
+
+#saving top 50 terms of pros and cons
+#d_all = cbind(d_pros[1:50,], d_cons[1:50,])
+#rownames(d_all) <- 1:nrow(d_all)
+#write.csv(d_all, "TF_All_Reviews.csv")
+
+## --adding word cloud visualization-- ##
+
+
+
+
+
+
+
+######################################################
+#### -- Hierarchical Clustering Analysis start -- ####
+######################################################
 
 
 #Hierarchical clustering - standardization by scale func 
@@ -264,15 +366,16 @@ hc$labels
 #check the results in plot
 plot(hc) # visualization of hclusering#
 
-#
-#
-#
 
-#####################################
-#### --K-mean clustering start-- ####
-#####################################
 
-nrow(mat_pros) #177
+
+
+
+################################################
+#### -- K-mean Clustering Analysis start -- ####
+################################################
+
+nrow(mat_pros)
 
 #k-mean clustering
 #mat_km = t(mat_pros)
@@ -294,9 +397,222 @@ rowSums(mat_pros) # frequencies of each term in row sums
 
 plot(mat_km$cluster) # visualization of k-mean cluster#
 
+
+
+
+
+
+##############################################
+#### -- LDA Topic model Analysis start -- ####
+##############################################
+
+set.seed(1234)
+
+# -- Pros LDA -- #
+
+ldaform_pros = dtm2ldaformat(dtm_pros, omit_empty=T)
+
+result.lda_pros = lda.collapsed.gibbs.sampler(documents = ldaform_pros$documents,
+                                         K = 10,
+                                         vocab = ldaform_pros$vocab,
+                                         num.iterations = 10000,  
+                                         burnin = 2000, # or 1000
+                                         alpha = 0.02,  
+                                         eta = 0.02 )
+# basic LDA attr info 
+#attributes(result.lda)
+#dim(result.lda$topics)    
+#result.lda$topics
+#dim(result.lda$document_sums)
+
+#all topics
+result.lda_pros$topics
+# 5 topics
+top.topic.words(result.lda_pros$topics)
+# sum of each topic
+result.lda_pros$topic_sums 
+# examples of topic modeling 
+result.lda_pros$document_sums[,1293] 
+
+
+# -- Cons LDA -- #
+
+ldaform_cons = dtm2ldaformat(dtm_cons, omit_empty = T)
+
+result.lda_cons = lda.collapsed.gibbs.sampler(documents = ldaform_cons$documents,
+                                              K = 10,
+                                              vocab = ldaform_cons$vocab,
+                                              num.iterations = 10000,  
+                                              burnin = 2000, # or 1000
+                                              alpha = 0.02,  
+                                              eta = 0.02 )
+
+#all topics
+result.lda_cons$topics
+# 5 topics
+top.topic.words(result.lda_cons$topics)
+# sum of each topic
+result.lda_cons$topic_sums 
+# examples of topic modeling 
+result.lda_cons$document_sums[,1293] 
+
+
+
+
+
+
+
+
+###########################################################
+#### -- Term Association | Correltion Anlysis start -- ####
+###########################################################
+
+#Association analysis of topic terms - as clean as possible!!! - new stopwords for this analysis
+pros_term = rownames(mat_pros)
+Assocs_pros = findAssocs(tdm_pros, pros_term, 0.1)
+findAssocs(tdm_pros, terms = c("flexibl", "care", "balanc", "help",  "develop"), corlimit = 0.2) # frequent term?
+
+findAssocs(tdm_pros, terms = c("balanc", "develop", "cultur"), corlimit = 0.2)
+
+findAssocs(tdm_pros, "balanc", corlimit = 0.1)
+#manual cluster!!!!!!!!
+findAssocs(tdm_pros, terms = c("balanc",  "schedul", "flexibl", "worklif", "life", "hour", "shift", "time", "remot", "famili", "person"), corlimit = 0.11)
+findAssocs(tdm_pros, terms = c("pay", "competit", "hour", "salari", "compens", "full", "time", "paid", "health", "insur", "plan", "stock", "option", "program"), corlimit = 0.11)
+findAssocs(tdm_pros, terms = c("manag", "employe", "hire", "peopl", "team", "never", "senior", "encourag", "leadership", "leader", "execut"), corlimit = 0.11)
+findAssocs(tdm_pros, terms = c("career", "develop", "growth", "profession", "person", "learn", "grow", "constant", "new", "train", "program"), corlimit = 0.11)
+findAssocs(tdm_pros, terms = c("cultur", "environ", "friend", "collabor", "team", "support", "provid", "care"), corlimit = 0.11)
+
+#Apriori algorithm to find term relation
+mat_dtm_pros[mat_dtm_pros>1] = 1
+rownames(mat_pros)
+rules1_pros = apriori(mat_dtm_pros, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
+inspect(sort(rules1_pros))
+
+
+mat_dtm_cons[mat_dtm_cons>1] = 1
+rownames(mat_cons)
+rules1_cons = apriori(mat_dtm_cons, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
+inspect(sort(rules1_cons))
+
+
+
+#Assocs-Apriori test
+mat_apriori_pros = matrix(data = 0, nrow = nrow(mat_pros), ncol = nrow(mat_pros))
+rownames(mat_apriori_pros) = rownames(tdm_pros)
+colnames(mat_apriori_pros) = rownames(tdm_pros)
+
+for (i in pros_term) {
+  term_assoc = findAssocs(tdm_pros, i, 0.15)
+  attrs_assoc = term_assoc[[1]]
+  for (j in 1:length(attrs_assoc)) {
+    name = names(attrs_assoc[j])
+    mat_apriori_pros[i,name] = 1
+  }
+}
+
+rules2_pros = apriori(mat_apriori_pros, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
+inspect(sort(rules2_pros))
+
+
+## -- Cons -- ##
+cons_term = rownames(mat_cons)
+Assocs_cons = findAssocs(tdm_cons, cons_term, 0.1)
+findAssocs(tdm_cons, terms = c("manag", "time", "hour","balanc"), corlimit = 0.1)
+
+
+mat_apriori_cons = matrix(data = 0, nrow = nrow(mat_cons), ncol = nrow(mat_cons))
+rownames(mat_apriori_cons) = rownames(tdm_cons)
+colnames(mat_apriori_cons) = rownames(tdm_cons)
+
+for (i in cons_term) {
+  term_assoc = findAssocs(tdm_cons, i, 0.15)
+  attrs_assoc = term_assoc[[1]]
+  for (j in 1:length(attrs_assoc)) {
+    name = names(attrs_assoc[j])
+    mat_apriori_cons[i,name] = 1
+  }
+}
+
+rules2_cons = apriori(mat_apriori_cons, parameter = list(support = 0.01, confidence = 0.20, minlen = 2))
+inspect(sort(rules2_cons))
+
+
+
+
+
+# word_cor function to show correlation with terms
+words_pros = row.names(tdm_pros)
+word_cor(tdm_pros, words_pros, type = "tdm", method = "pearson", p = 0.1, min = 0.1)
+
+word_cor(tdm_pros, c("cultur", "valu", "balanc"), type = "tdm", method = "pearson", p = 0.1, min = 0.1)
+
+words_cons = row.names(tdm_cons)
+word_cor(tdm_cons, words_cons, type = "tdm", method = "pearson", p = 0.1, min = 0.1)
+
+
+
+
+
+
+
+#####################################
+#### --Sentiment anlysis start-- ####
+#####################################
+
+# 
 #
-#
-#
+# -- Pros --
+p<-as.character(pros)
+#syuzhet 
+syuzhet_vector_pros <- get_sentiment(p, method="syuzhet")
+syuzhet_vector_pros
+head(syuzhet_vector_pros)
+summary(syuzhet_vector_pros)     
+
+# bing
+bing_vector_pros <- get_sentiment(p, method="bing")
+head(bing_vector_pros)
+summary(bing_vector_pros)
+
+#affin
+afinn_vector_pros <- get_sentiment(p, method="afinn")
+head(afinn_vector_pros)
+summary(afinn_vector_pros)
+
+
+#emotionanalysis
+c_pros <-get_nrc_sentiment(p)
+head (c_pros,5)
+
+
+
+# -- Cons --
+#SENTIMENT 
+c<-as.character(cons)
+#syuzhet 
+syuzhet_vector_cons <- get_sentiment(c, method="syuzhet")
+head(syuzhet_vector_cons)
+summary(syuzhet_vector_cons)     
+
+# bing
+bing_vector_cons <- get_sentiment(c, method="bing")
+head(bing_vector_cons)
+summary(bing_vector_cons)
+
+#affin
+afinn_vector_pros <- get_sentiment(c, method="afinn")
+head(afinn_vector_pros)
+summary(afinn_vector_pros)
+
+c_cons <-get_nrc_sentiment(c)
+head (d,5)
+
+
+
+
+
+
+
 
 #############################################
 #### --Further cluster | model analysis--####
@@ -304,44 +620,46 @@ plot(mat_km$cluster) # visualization of k-mean cluster#
 
 #from course material
 #build manual cluster to further analysis | model
-cluster1 <- dtm_pros[,c("remot", "sale", "stock", "discount")]; head(cluster1)
-
+#how to select words? -> findAssocs - with key words of each criteria
+cluster1 <- dtm_pros[,c("manag", "employe", "hire", "peopl", "team", "never", "senior", "encourag", "leadership", "leader", "execut")]; head(cluster1)
+cluster2 <- dtm_pros[,c("balanc",  "schedul", "flexibl", "worklif", "life", "hour", "time", "remot", "famili", "person")]; head(cluster2) # shift
+cluster3 <- dtm_pros[,c("pay", "competit", "hour", "salari", "compens", "full", "time", "paid", "health", "insur", "plan", "stock", "option", "program")]; head(cluster3)
+cluster4 <- dtm_pros[,c("cultur", "environ", "friend", "collabor", "team", "support", "provid", "care", "fun")]; head(cluster4)
+cluster5 <- dtm_pros[,c("career", "develop", "growth", "profession", "person", "learn", "grow", "constant", "train", "program")]; head(cluster5) # new
 
 # code from course material #### On the Work! ##################################################################################################################################
 # Sums #
-C1_Sum <- rowSums(cluster1)
-C2_Sum <- rowSums(cluster2)
-C3_Sum <- rowSums(cluster3)
+C1_Sum <- rowSums(cluster1); C1_Sum
+C2_Sum <- rowSums(cluster2); C2_Sum
+C3_Sum <- rowSums(cluster3); C3_Sum
+C4_Sum <- rowSums(cluster3); C4_Sum
+C5_Sum <- rowSums(cluster3); C5_Sum
 
 # Create a Score table #
-Score <- matrix(data=0 , n_desc,3);
+Score <- matrix(data=0 , n_desc,5);
 Score[,1] <- as.matrix(C1_Sum)
 Score[,2] <- as.matrix(C2_Sum)
 Score[,3] <- as.matrix(C3_Sum)
+Score[,4] <- as.matrix(C3_Sum)
+Score[,5] <- as.matrix(C3_Sum)
 
 # Name the Columns/Clusters #
-colnames(Score) <- c("Cluster1", "Cluster2", "Cluster3")
+colnames(Score) <- c("Cluster1", "Cluster2", "Cluster3", "Cluster4", "Cluster5")
 head(Score)
 
 ## Add a Score matrix to the original Data ##
-csv_new <- cbind(csv, Score)
-str(csv)
+
 
 ## Run a Regression ##
 
-summary(csv_new[,c('Rank','Price','Screenshot','Size','StarCurrentVersion', 'RatingCurrentVersion', 'TopInAppPurchases','Cluster1','Cluster2','Cluster3')])
+
 
 # Variable Transformation #
-Sales <- -log(Apps_new$Rank)
-Log_Rating_Num <- log(Apps_new$RatingCurrentVersion+1)
 
-Apps_new <-cbind(Apps_new, Sales)
-Apps_new <-cbind(Apps_new, Log_Rating_Num)
 
 
 # Build a regression model #
-Apps_Reg <- lm(Sales ~ Price + Screenshot + Size + StarCurrentVersion + Log_Rating_Num + TopInAppPurchases + Cluster1 + Cluster2 + Cluster3, data=Apps_new)
-summary(Apps_Reg)
+
 #####################################################################################################################################################################
 
 #
@@ -352,48 +670,9 @@ summary(Apps_Reg)
 #### --Visualization start-- ####
 #################################
 
-##################
-#1. plotting pros#
-##################
-freq_pros = rowSums(mat_pros, na.rm=TRUE)
-
-#showing data more than 50 frequency
-freq_pros = subset(freq_pros, freq_pros>=50)
-barplot(freq_pros, las = 2) # visualization #
-
-#sorting
-v_pros <- sort(rowSums(mat_pros),decreasing=TRUE) 
-d_pros <- data.frame(word = names(v_pros),freq=v_pros)
-
-# top 50 in console
-head(d_pros, 20)
-
-## --adding word cloud visualization-- ##
 
 
-##################
-#2. plotting cons#
-##################
-freq_cons = rowSums(mat_cons, na.rm=TRUE)
 
-#showing data more than 50 frequency
-freq_cons = subset(freq_cons, freq_cons>=50)
-barplot(freq_cons, las = 2) # visualization #
-
-#sorting
-v_cons <- sort(rowSums(mat_cons),decreasing=TRUE) 
-d_cons <- data.frame(word = names(v_cons),freq=v_cons)
-
-# top 50 in console
-head(d_cons, 50)
-
-#saving top 50 terms of pros and cons
-d_all = cbind(d_pros[1:50,], d_cons[1:50,])
-rownames(d_all) <- 1:nrow(d_all)
-
-write.csv(d_all, "TF_All_Reviews.csv")
-
-## --adding word cloud visualization-- ##
 
 
 #
