@@ -13,20 +13,22 @@ library(ggplot2)
 library(wordcloud)
 
 #setting working directory where csv files are located
-setwd("C:/Users/user/Desktop/glassdoor/reviews")
-#setwd("/Users/igihun/Desktop/glassdoor/reviews")
+#setwd("C:/Users/user/Desktop/glassdoor/reviews")
+setwd("/Users/igihun/Desktop/glassdoor/reviews")
+
+
+
 
 ###########################################################
 #### -- Merging all companies csv files into 1 file -- ####
 ###########################################################
 
-review_dir = "C:/Users/user/Desktop/glassdoor/reviews"
+#review_dir = "C:/Users/user/Desktop/glassdoor/reviews"
+review_dir = "/Users/igihun/Desktop/glassdoor/reviews"
 review_list = list.files(review_dir)
 
 #Please write your name in English in between quotation marks
 name = "all"
-
-
 
 #making empty data frame
 data = data.frame()
@@ -51,9 +53,11 @@ write.csv(data, fin_name)
 
 
 
+## -- CSV Variables -- ##
+
 #reading Merged csv file - beware of encoding
 #csv = read.csv("all_review.csv", encoding = "UTF-8")
-csv = read.csv("C:/Users/user/Desktop/glassdoor/reviews/all_review.csv")
+csv = read.csv("/Users/igihun/Desktop/glassdoor/reviews/all_review.csv")
 
 #extracting review data variables
 pros = csv$pros
@@ -109,12 +113,11 @@ for (i in csv$X) {
 }
 
 #Individual corporation summary
-sum_bal = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_balance), na.rm = T))
-sum_cul = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_culture), na.rm = T))
-sum_car = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_career), na.rm = T))
-sum_ben = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_comp), na.rm = T))
-sum_mgn = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_mgmt), na.rm = T))
-
+sum_bal = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_balance), na.rm = T), SD = sd(as.numeric(rating_balance), na.rm = T))
+sum_cul = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_culture), na.rm = T), SD = sd(as.numeric(rating_culture), na.rm = T))
+sum_car = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_career), na.rm = T), SD = sd(as.numeric(rating_career), na.rm = T))
+sum_ben = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_comp), na.rm = T), SD = sd(as.numeric(rating_comp), na.rm = T))
+sum_mgn = summarise(group_by(csv, cor_name), mean = mean(as.numeric(rating_mgmt), na.rm = T), SD = sd(as.numeric(rating_mgmt), na.rm = T))
 
 
 
@@ -460,9 +463,6 @@ result.lda_cons$document_sums[,1293]
 
 
 
-
-
-
 ###########################################################
 #### -- Term Association | Correltion Anlysis start -- ####
 ###########################################################
@@ -562,14 +562,15 @@ word_cor(tdm_cons, words_cons, type = "tdm", method = "pearson", p = 0.1, min = 
 # 
 #
 # -- Pros --
-p<-as.character(pros)
+pros_names = rownames(tdm_pros)
+p<-as.character(pros_names)
 #syuzhet 
 syuzhet_vector_pros <- get_sentiment(p, method="syuzhet")
-syuzhet_vector_pros
 head(syuzhet_vector_pros)
+plot(syuzhet_vector_pros)
 summary(syuzhet_vector_pros)     
 
-# bing
+#bing
 bing_vector_pros <- get_sentiment(p, method="bing")
 head(bing_vector_pros)
 summary(bing_vector_pros)
@@ -579,7 +580,6 @@ afinn_vector_pros <- get_sentiment(p, method="afinn")
 head(afinn_vector_pros)
 summary(afinn_vector_pros)
 
-
 #emotionanalysis
 c_pros <-get_nrc_sentiment(p)
 head (c_pros,5)
@@ -588,9 +588,11 @@ head (c_pros,5)
 
 # -- Cons --
 #SENTIMENT 
-c<-as.character(cons)
+cons_names = rownames(tdm_cons)
+c<-as.character(cons_names)
 #syuzhet 
 syuzhet_vector_cons <- get_sentiment(c, method="syuzhet")
+plot(syuzhet_vector_cons)
 head(syuzhet_vector_cons)
 summary(syuzhet_vector_cons)     
 
@@ -604,12 +606,8 @@ afinn_vector_pros <- get_sentiment(c, method="afinn")
 head(afinn_vector_pros)
 summary(afinn_vector_pros)
 
-c_cons <-get_nrc_sentiment(c)
-head (d,5)
-
-
-
-
+c_cons <-get_nrc_sentiment(c);
+summary(c_cons)
 
 
 
@@ -627,13 +625,40 @@ cluster3 <- dtm_pros[,c("pay", "competit", "hour", "salari", "compens", "full", 
 cluster4 <- dtm_pros[,c("cultur", "environ", "friend", "collabor", "team", "support", "provid", "care", "fun")]; head(cluster4)
 cluster5 <- dtm_pros[,c("career", "develop", "growth", "profession", "person", "learn", "grow", "constant", "train", "program")]; head(cluster5) # new
 
+clu1_tfidf = dtm_pros_tfidf[, c("manag", "employe", "hire", "peopl", "team", "never", "senior", "encourag", "leadership", "leader", "execut")]
+clu2_tfidf <- dtm_pros_tfidf[,c("balanc",  "schedul", "flexibl", "worklif", "life", "hour", "time", "remot", "famili", "person")]; head(cluster2) # shift
+clu3_tfidf <- dtm_pros_tfidf[,c("pay", "competit", "hour", "salari", "compens", "full", "time", "paid", "health", "insur", "plan", "stock", "option", "program")]; head(cluster3)
+clu4_tfidf <- dtm_pros_tfidf[,c("cultur", "environ", "friend", "collabor", "team", "support", "provid", "care", "fun")]; head(cluster4)
+clu5_tfidf <- dtm_pros_tfidf[,c("career", "develop", "growth", "profession", "person", "learn", "grow", "constant", "train", "program")]; head(cluster5) 
+
+
+
 # code from course material #### On the Work! ##################################################################################################################################
 # Sums #
-C1_Sum <- rowSums(cluster1); C1_Sum
-C2_Sum <- rowSums(cluster2); C2_Sum
-C3_Sum <- rowSums(cluster3); C3_Sum
-C4_Sum <- rowSums(cluster3); C4_Sum
-C5_Sum <- rowSums(cluster3); C5_Sum
+C1_Sum <- colSums(as.matrix(cluster1)); C1_Sum
+c1_sum = unname(C1_Sum); sum(c1_sum)
+C2_Sum <- colSums(as.matrix(cluster2)); C2_Sum
+c2_sum = unname(C2_Sum); sum(c2_sum)
+C3_Sum <- colSums(as.matrix(cluster3)); C3_Sum
+c3_sum = unname(C3_Sum); sum(c3_sum)
+C4_Sum <- colSums(as.matrix(cluster4)); C4_Sum
+c4_sum = unname(C4_Sum); sum(c4_sum)
+C5_Sum <- colSums(as.matrix(cluster5)); C5_Sum
+c5_sum = unname(C5_Sum); sum(c5_sum)
+
+
+C1_Sum_tfidf = colSums(as.matrix(clu1_tfidf)) 
+c1_sum_tfidf = unname(C1_Sum_tfidf); sum(c1_sum_tfidf)
+C2_Sum_tfidf = colSums(as.matrix(clu2_tfidf)) 
+c2_sum_tfidf = unname(C2_Sum_tfidf); sum(c2_sum_tfidf)
+C3_Sum_tfidf = colSums(as.matrix(clu3_tfidf)) 
+c3_sum_tfidf = unname(C3_Sum_tfidf); sum(c3_sum_tfidf)
+C4_Sum_tfidf = colSums(as.matrix(clu4_tfidf)) 
+c4_sum_tfidf = unname(C4_Sum_tfidf); sum(c4_sum_tfidf)
+C5_Sum_tfidf = colSums(as.matrix(clu5_tfidf)) 
+c5_sum_tfidf = unname(C5_Sum_tfidf); sum(c5_sum_tfidf)
+
+
 
 # Create a Score table #
 Score <- matrix(data=0 , n_desc,5);
@@ -644,7 +669,7 @@ Score[,4] <- as.matrix(C3_Sum)
 Score[,5] <- as.matrix(C3_Sum)
 
 # Name the Columns/Clusters #
-colnames(Score) <- c("Cluster1", "Cluster2", "Cluster3", "Cluster4", "Cluster5")
+colnames(Score) <- c("Management", "Balance", "Compensation", "Culture", "Development")
 head(Score)
 
 ## Add a Score matrix to the original Data ##
@@ -653,9 +678,7 @@ head(Score)
 ## Run a Regression ##
 
 
-
 # Variable Transformation #
-
 
 
 # Build a regression model #
